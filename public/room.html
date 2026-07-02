@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Room - SpaceT</title>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-panel: #151d30;
+            --bg-card: #1e2942;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --success: #10b981;
+            --border: #2d3748;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg-main); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            background: var(--bg-panel);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border); 
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .status-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        #status { 
+            margin: 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            box-sizing: border-box;
+        }
+
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); 
+            gap: 20px; 
+        }
+
+        .participant { 
+            background: var(--bg-panel); 
+            padding: 24px 16px; 
+            border-radius: 12px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            text-align: center; 
+            border: 2px solid var(--border); 
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+            position: relative;
+        }
+
+        /* Avatar circle representation */
+        .avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--bg-card);
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .participant-name {
+            font-size: 0.95rem;
+            font-weight: 500;
+            width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Speaking ring and indicator styling */
+        .participant.speaking { 
+            border-color: var(--success); 
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.2); 
+        }
+        
+        .participant.speaking .avatar {
+            border-color: var(--success);
+        }
+
+        .controls { 
+            background: var(--bg-panel);
+            padding: 1.25rem;
+            display: flex; 
+            justify-content: center;
+            gap: 1rem; 
+            border-top: 1px solid var(--border);
+        }
+
+        .btn { 
+            padding: 12px 28px; 
+            border-radius: 50px; 
+            border: none; 
+            font-weight: 600; 
+            font-size: 0.95rem;
+            cursor: pointer; 
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-danger { 
+            background: var(--danger); 
+            color: white; 
+        }
+        .btn-danger:hover { background: var(--danger-hover); }
+
+        .btn-mute { 
+            background: var(--bg-card); 
+            color: white; 
+            border: 1px solid var(--border);
+        }
+        .btn-mute:hover { background: var(--border); }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1 id="roomTitle">Room: Loading...</h1>
+        <div class="status-container">
+            <span class="status-dot" id="statusDot"></span>
+            <p id="status">Connecting to audio server...</p>
+        </div>
+    </div>
+    <button class="btn btn-danger" onclick="leaveRoom()">Leave Space</button>
+</div>
+
+<div class="main-content">
+    <div class="grid" id="participantsGrid"></div>
+</div>
+
+<div class="controls">
+    <button id="muteBtn" class="btn btn-mute" onclick="toggleMute()">🎙️ Mute Mic</button>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('id');
+    const userName = localStorage.getItem('spaceT_name') || 'Anonymous';
+
+    if (!roomId) {
+        alert("No Room ID found. Going back home.");
+        window.location.href = '/';
+    }
+
+    document.getElementById('roomTitle').innerText = `Space: ${roomId}`;
+
+    let currentRoom;
+
+    async function initVoiceRoom() {
+        try {
+            const res = await fetch('/api/join-room', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomId, name: userName })
+            });
+            const data = await res.json();
+
+            if (!data.success) throw new Error(data.error);
+
+            currentRoom = new LivekitClient.Room();
+
+            currentRoom
+                .on(LivekitClient.RoomEvent.ParticipantConnected, updateParticipantUI)
+                .on(LivekitClient.RoomEvent.ParticipantDisconnected, updateParticipantUI)
+                .on(LivekitClient.RoomEvent.ActiveSpeakersChanged, handleSpeakerChanges)
+                .on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
+                    if (track.kind === 'audio') track.attach(); 
+                });
+
+            await currentRoom.connect(data.wsUrl, data.token);
+            document.getElementById('status').innerText = `Connected as ${userName} (Mic Active)`;
+            document.getElementById('statusDot').style.background = "var(--success)";
+
+            await currentRoom.localParticipant.setMicrophoneEnabled(true);
+            
+            updateParticipantUI();
+
+        } catch (err) {
+            console.error(err);
+            document.getElementById('status').innerText = "Connection failed: " + err.message;
+            document.getElementById('statusDot').style.background = "var(--danger)";
+        }
+    }
+
+    function updateParticipantUI() {
+        const grid = document.getElementById('participantsGrid');
+        grid.innerHTML = ''; 
+
+        if (!currentRoom) return;
+
+        const allParticipants = [currentRoom.localParticipant, ...currentRoom.remoteParticipants.values()];
+
+        allParticipants.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'participant';
+            card.id = `party-${p.identity}`;
+            
+            const resolvedName = p.name || p.identity.substring(0, 5);
+            const initials = resolvedName.substring(0, 2).toUpperCase();
+
+            card.innerHTML = `
+                <div class="avatar">${initials}</div>
+                <div class="participant-name">${resolvedName}</div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    function handleSpeakerChanges(speakers) {
+        document.querySelectorAll('.participant').forEach(el => el.classList.remove('speaking'));
+        speakers.forEach(s => {
+            const el = document.getElementById(`party-${s.identity}`);
+            if (el) el.classList.add('speaking');
+        });
+    }
+
+    async function toggleMute() {
+        const isCurrentlyMuted = !currentRoom.localParticipant.isMicrophoneEnabled;
+        await currentRoom.localParticipant.setMicrophoneEnabled(isCurrentlyMuted);
+        
+        const muteBtn = document.getElementById('muteBtn');
+        const statusDot = document.getElementById('statusDot');
+
+        if (isCurrentlyMuted) {
+            muteBtn.innerHTML = "🎙️ Mute Mic";
+            muteBtn.style.background = "var(--bg-card)";
+            document.getElementById('status').innerText = `Connected as ${userName} (Mic Active)`;
+            statusDot.style.background = "var(--success)";
+        } else {
+            muteBtn.innerHTML = "🔇 Unmute Mic";
+            muteBtn.style.background = "var(--danger)";
+            document.getElementById('status').innerText = `Connected ● Muted`;
+            statusDot.style.background = "#f59e0b"; // Warning amber color
+        }
+    }
+
+    function leaveRoom() {
+        if (currentRoom) currentRoom.disconnect();
+        window.location.href = '/';
+    }
+
+    initVoiceRoom();
+</script>
+
+</body>
+</html>

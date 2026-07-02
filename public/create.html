@@ -1,1 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceT - Audio Rooms</title>
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #151d30;
+            --bg-input: #1e2942;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --secondary: #1f2937;
+            --secondary-hover: #374151;
+            --border: #2d3748;
+        }
 
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg-main); 
+            color: var(--text-main); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+        }
+
+        .card { 
+            background: var(--bg-card); 
+            padding: 2.5rem; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); 
+            width: 100%; 
+            max-width: 380px; 
+            text-align: center; 
+            border: 1px solid var(--border);
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .input-group {
+            text-align: left;
+            margin-bottom: 1.25rem;
+        }
+
+        label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        input { 
+            width: 100%; 
+            padding: 12px 16px; 
+            border-radius: 8px; 
+            border: 1px solid var(--border); 
+            background: var(--bg-input); 
+            color: var(--text-main); 
+            box-sizing: border-box; 
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+
+        button { 
+            width: 100%; 
+            padding: 14px; 
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 600; 
+            font-size: 1rem;
+            transition: background 0.2s, transform 0.1s; 
+        }
+
+        button:hover { 
+            background: var(--primary-hover); 
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .divider { 
+            margin: 24px 0; 
+            color: var(--text-muted); 
+            font-size: 12px; 
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+        }
+
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            background: var(--border);
+            height: 1px;
+            margin: 0 10px;
+        }
+
+        .btn-secondary {
+            background: var(--secondary); 
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--secondary-hover);
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Welcome to SpaceT</h2>
+    
+    <div class="input-group">
+        <label for="userName">YOUR DISPLAY NAME</label>
+        <input type="text" id="userName" placeholder="e.g. Alex" required>
+    </div>
+    
+    <button onclick="createRoom()">🚀 Create New Voice Room</button>
+    
+    <div class="divider">OR JOIN EXISTING</div>
+    
+    <div class="input-group">
+        <label for="roomIdInput">ROOM ID</label>
+        <input type="text" id="roomIdInput" placeholder="Enter 8-character ID">
+    </div>
+    <button class="btn-secondary" onclick="joinExistingRoom()">Join Room</button>
+</div>
+
+<script>
+    async function createRoom() {
+        const name = document.getElementById('userName').value.trim();
+        if (!name) return alert('Please enter your name first!');
+
+        const response = await fetch('/api/create-room', { method: 'POST' });
+        const result = await response.json();
+        
+        if (result.success) {
+            localStorage.setItem('spaceT_name', name);
+            window.location.href = `/room.html?id=${result.roomId}`;
+        }
+    }
+
+    function joinExistingRoom() {
+        const name = document.getElementById('userName').value.trim();
+        const roomId = document.getElementById('roomIdInput').value.trim();
+        if (!name || !roomId) return alert('Please enter both your name and a Room ID!');
+
+        localStorage.setItem('spaceT_name', name);
+        window.location.href = `/room.html?id=${roomId}`;
+    }
+</script>
+
+</body>
+</html>
