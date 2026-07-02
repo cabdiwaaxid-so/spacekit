@@ -7,6 +7,11 @@ const app = new novax();
 
 // Serve your HTML, CSS, and JS files from the root directory
 app.serveStatic();
+app.cors({
+  origins: ['*'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  headers: ['Content-Type', 'Authorization', 'X-Requested-With']
+});
 
 async function createToken({ identity, name, room }) {
   const at = new AccessToken(process.env.LIVEKIT_API_KEY, process.env.LIVEKIT_API_SECRET, { identity, name });
@@ -49,6 +54,7 @@ app.post('/api/join-room', async (req, res) => {
 });
 
 app.at(3000, () => console.log('SpaceT Server UI running on http://localhost:3000'));
+
 module.exports = (req, res) => {
-  app.server.emit('request', req);
+  app.server.emit('request', req, res);
 }
